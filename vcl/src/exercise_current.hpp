@@ -1,4 +1,4 @@
 #pragma once
 
 // Indicate here which exercise should be currently considered
-#define EXERCISE_SPRITES
+#define EXERCISE_BOIDS

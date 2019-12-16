@@ -23,6 +23,13 @@ void scene_exercise::setup_data(std::map<std::string,GLuint>& , scene_structure&
     cone.uniform_parameter.color = {0,0,1};
 }
 
+float force(float x)
+{
+    float alpha1 = 2000.1f;
+    float alpha2 = 2000.2f;
+    float res = alpha1/(x*x) - alpha2/(x*x*x*x);
+    return res;
+}
 
 void scene_exercise::frame_draw(std::map<std::string,GLuint>& shaders, scene_structure& scene, gui_structure& )
 {
@@ -35,7 +42,18 @@ void scene_exercise::frame_draw(std::map<std::string,GLuint>& shaders, scene_str
         particles[k].f = {0,0,0};
 
     // Add forces ...
+    for(int i=0; i<N; ++i)
+    {
+        for(int j=i+1; j<N; ++j)
+        {
+                const vec3& pi = boids[i].p;
+                const vec3& pj = boids[j].p;
+                float f = force(norm(pi,pj)) * (pi-pj)/norm(pi-pj);
+                boids[i].f += f;
+                boids[j].f += -f;
 
+        }
+    }
 
     // Integrate position and speed of boids through time
     for(size_t k=0; k<N; ++k)
