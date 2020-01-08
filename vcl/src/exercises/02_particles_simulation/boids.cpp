@@ -46,11 +46,11 @@ void scene_exercise::frame_draw(std::map<std::string,GLuint>& shaders, scene_str
     {
         for(int j=i+1; j<N; ++j)
         {
-                const vec3& pi = boids[i].p;
-                const vec3& pj = boids[j].p;
-                float f = force(norm(pi,pj)) * (pi-pj)/norm(pi-pj);
-                boids[i].f += f;
-                boids[j].f += -f;
+                const vec3& pi = particles[i].p;
+                const vec3& pj = particles[j].p;
+                vec3 f = force(norm(pi - pj)) * ((pi - pj) / norm(pi - pj));
+                particles[i].f += f;
+                particles[j].f += -f;
 
         }
     }
