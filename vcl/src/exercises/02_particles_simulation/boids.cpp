@@ -2,6 +2,7 @@
 #include "boids.hpp"
 
 #include <random>
+#include <algorithm>
 
 #ifdef EXERCISE_BOIDS
 
@@ -23,11 +24,27 @@ void scene_exercise::setup_data(std::map<std::string,GLuint>& , scene_structure&
     cone.uniform_parameter.color = {0,0,1};
 }
 
-float force(float dist)
+template <typename T>
+static inline T constrain(const T& min, const T& val, const T& max) {
+    return std::max(std::min(val, max), min);
+}
+
+/**
+ * Positive return value => get further
+ * Negative return value => get closer
+ */
+float force(float d)
 {
-    if (dist < 0.00000001f)
+    if (d < 0.0000000001f) // == 0
         return 0.f;
-    return -1.f / dist;
+    constexpr float k = 1.f;
+    constexpr float max_speed = 0.5f;
+    float dk = k - d; // dk < 0 => get closer, dk > 0 => get further
+    return constrain(-max_speed, dk < 0 ? -1.f / (dk * dk) : 1.f / (2.f * dk), max_speed);
+}
+
+static inline vec3 normalize(const vec3& v) {
+    return v / norm(v);
 }
 
 void scene_exercise::frame_draw(std::map<std::string,GLuint>& shaders, scene_structure& scene, gui_structure& )
@@ -40,6 +57,9 @@ void scene_exercise::frame_draw(std::map<std::string,GLuint>& shaders, scene_str
     for(size_t k=0; k<N; ++k)
         particles[k].f = {0,0,0};
 
+    const vec3 direction = {0.0,1.0,0.0};
+    const float dir_weight = 0.15f;
+
     // 
     // Add forces ...
     for(int i=0; i<N; ++i)
@@ -48,9 +68,11 @@ void scene_exercise::frame_draw(std::map<std::string,GLuint>& shaders, scene_str
         {
                 const vec3& pi = particles[i].p;
                 const vec3& pj = particles[j].p;
-                vec3 f = force(norm(pi - pj)) * ((pi - pj) / norm(pi - pj));
+                vec3 f = force(norm(pi - pj)) * normalize(pi - pj);
                 particles[i].f += f;
                 particles[j].f += -f;
+                // particles[i].f += dir_weight * direction;
+                // particles[j].f += dir_weight * direction;
         }
     }
 
