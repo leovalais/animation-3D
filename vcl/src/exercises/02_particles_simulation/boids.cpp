@@ -10,18 +10,19 @@ using namespace vcl;
 
 
 
-void add_boids(std::vector<particle_structure>& particles);
-static void set_gui(std::vector<particle_structure>& particles,timer_basic& timer);
+void add_boids(std::vector<particle_structure>& particles, std::vector<vcl::curve_dynamic_drawable>& trajectories);
+static void set_gui(std::vector<particle_structure>& particles,timer_basic& timer, std::vector<vcl::curve_dynamic_drawable>& trajectories);
 
 void scene_exercise::setup_data(std::map<std::string,GLuint>& , scene_structure& , gui_structure& )
 {
     // Create boids
-    add_boids(particles);
+    add_boids(particles, trajectories);
 
     // Initialize the visual model of boids
     cone = mesh_drawable( mesh_primitive_cone(0.1f,{0,0,0},{0,0,0.5f}) );
     cone.uniform_parameter.scaling = 0.15f;
     cone.uniform_parameter.color = {0,0,1};
+
 }
 
 template <typename T>
@@ -50,7 +51,7 @@ static inline vec3 normalize(const vec3& v) {
 void scene_exercise::frame_draw(std::map<std::string,GLuint>& shaders, scene_structure& scene, gui_structure& )
 {
     const float dt = timer.update();
-    set_gui(particles,timer);
+    set_gui(particles,timer, trajectories);
 
     // Initialize forces to zero
     const size_t N = particles.size();
@@ -84,6 +85,7 @@ void scene_exercise::frame_draw(std::map<std::string,GLuint>& shaders, scene_str
 
         particle.v = particle.v + dt*particle.f;
         particle.p = particle.p + dt*particle.v;
+        trajectories[k].add_point(particle.p);
     }
 
     // 
@@ -99,11 +101,17 @@ void scene_exercise::frame_draw(std::map<std::string,GLuint>& shaders, scene_str
 
         cone.draw(shaders["mesh"], scene.camera);
     }
+
+    //a commenter pour virer les traces
+    for(size_t k=0; k<N; ++k)
+    {
+        trajectories[k].draw(shaders["curve"], scene.camera);
+    }
 }
 
 
 /** Add new boids in the scene */
-void add_boids(std::vector<particle_structure>& particles)
+void add_boids(std::vector<particle_structure>& particles, std::vector<vcl::curve_dynamic_drawable>& trajectories)
 {
     // Max number of boids to be added
     const size_t N = 50;
@@ -123,10 +131,17 @@ void add_boids(std::vector<particle_structure>& particles)
 
         particles.push_back(particle);
     }
+
+    for (size_t i = 0; i < N; i++)
+    {
+        vcl::curve_dynamic_drawable trajectory = curve_dynamic_drawable(100);
+        trajectory.uniform_parameter.color = {0,0,1};
+        trajectories.push_back(trajectory);
+    }
 }
 
 
-static void set_gui(std::vector<particle_structure>& particles,timer_basic& timer)
+static void set_gui(std::vector<particle_structure>& particles,timer_basic& timer, std::vector<vcl::curve_dynamic_drawable>& trajectories)
 {
     // Can set the speed of the animation
     float scale_min = 0.05f;
@@ -140,7 +155,7 @@ static void set_gui(std::vector<particle_structure>& particles,timer_basic& time
         timer.start();
 
     if (ImGui::Button("Add boids"))
-        add_boids(particles);
+        add_boids(particles, trajectories);
 }
 
 

@@ -4,6 +4,7 @@
 
 #ifdef EXERCISE_BOIDS
 
+
 // Structure of a particle
 struct particle_structure
 {
@@ -19,6 +20,7 @@ struct scene_exercise : base_scene_exercise
     void frame_draw(std::map<std::string,GLuint>& shaders, scene_structure& scene, gui_structure& gui);
 
 
+    std::vector<vcl::curve_dynamic_drawable> trajectories;
     std::vector<particle_structure> particles; // Boids
     vcl::mesh_drawable cone;                   // Visual display of boids as cones
 
