@@ -3,6 +3,8 @@
 
 #include <random>
 #include <algorithm>
+#include <chrono>
+#include <optional>
 
 #ifdef EXERCISE_BOIDS
 
@@ -13,16 +15,43 @@ using namespace vcl;
 void add_boids(std::vector<particle_structure>& particles, std::vector<vcl::curve_dynamic_drawable>& trajectories);
 static void set_gui(std::vector<particle_structure>& particles,timer_basic& timer, std::vector<vcl::curve_dynamic_drawable>& trajectories);
 
+static unsigned long int get_elapsed_time() {
+    static auto start = std::chrono::steady_clock::now();
+    auto now = std::chrono::steady_clock::now();
+    auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(now - start).count();
+    start = now;
+    return elapsed;
+}
+
+static std::optional<unsigned long int>
+hacked_timer(std::optional<unsigned long int> time_ms = std::nullopt) {
+    static unsigned long int time_left = 0;
+    if (time_ms == std::nullopt) {
+        auto elapsed = get_elapsed_time();
+        time_left = elapsed > time_left ? 0 : time_left - elapsed;
+        if (time_left == 0)
+            return std::nullopt;
+        else
+            return time_left;
+    }
+    else {
+        time_left = *time_ms;
+        return time_left;
+    }
+}
+
 void scene_exercise::setup_data(std::map<std::string,GLuint>& , scene_structure& , gui_structure& )
 {
     // Create boids
     add_boids(particles, trajectories);
 
     // Initialize the visual model of boids
-    cone = mesh_drawable( mesh_primitive_cone(0.1f,{0,0,0},{0,0,0.5f}) );
+    cone = mesh_drawable(mesh_primitive_cone(0.1f, {0,0,0}, {0,0,0.5f}));
     cone.uniform_parameter.scaling = 0.15f;
     cone.uniform_parameter.color = {0,0,1};
 
+    // init time counter
+    get_elapsed_time();
 }
 
 template <typename T>
@@ -41,7 +70,7 @@ float force(float d)
     constexpr float k = 1.f;
     constexpr float max_speed = 0.5f;
     float dk = k - d; // dk < 0 => get closer, dk > 0 => get further
-    return constrain(-max_speed, dk < 0 ? -1.f / (dk * dk) : 1.f / (2.f * dk), max_speed);
+    return constrain(-max_speed, dk < 0 ? -1.f / (dk * dk) : 1.f / dk, max_speed);
 }
 
 static inline vec3 normalize(const vec3& v) {
@@ -58,8 +87,20 @@ void scene_exercise::frame_draw(std::map<std::string,GLuint>& shaders, scene_str
     for(size_t k=0; k<N; ++k)
         particles[k].f = {0,0,0};
 
-    const vec3 direction = {0.0,1.0,0.0};
-    const float dir_weight = 0.15f;
+    // static int dir_idx = 0;
+    // static const vec3 directions[] = {{0,1,0}, {1,0,0}, {0.5,0.5,0}, {0.5,-0.5,0}, {-0.5,0.5,0}, {-0.5,0.5,0}, {0,-1,0}, {-1,0,0}};
+    // constexpr auto dir_count = 8;
+    const float dir_weight = 0.015f;
+    static vec3 direction = {0.0,0.0,0.0};
+
+    if (!hacked_timer()) {
+        hacked_timer(2000);
+        // direction = directions[dir_idx++ % dir_count];
+        const auto between_minus_one_and_one = [](){
+            return 2.f * (static_cast <float> (rand()) / static_cast <float> (RAND_MAX)) - 1.f;
+        };
+        direction = normalize({between_minus_one_and_one(), between_minus_one_and_one(), 0.f});
+    }
 
     // 
     // Add forces ...
@@ -72,8 +113,8 @@ void scene_exercise::frame_draw(std::map<std::string,GLuint>& shaders, scene_str
                 vec3 f = force(norm(pi - pj)) * normalize(pi - pj);
                 particles[i].f += f;
                 particles[j].f += -f;
-                // particles[i].f += dir_weight * direction;
-                // particles[j].f += dir_weight * direction;
+                particles[i].f += dir_weight * direction;
+                particles[j].f += dir_weight * direction;
         }
     }
 
