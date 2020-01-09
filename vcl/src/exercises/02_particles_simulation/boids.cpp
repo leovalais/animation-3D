@@ -40,7 +40,7 @@ hacked_timer(std::optional<unsigned long int> time_ms = std::nullopt) {
     }
 }
 
-void scene_exercise::setup_data(std::map<std::string,GLuint>& , scene_structure& , gui_structure& )
+void scene_exercise::setup_data(std::map<std::string,GLuint>& , scene_structure&, gui_structure&)
 {
     // Create boids
     add_boids(particles, trajectories);
@@ -59,6 +59,7 @@ static inline T constrain(const T& min, const T& val, const T& max) {
     return std::max(std::min(val, max), min);
 }
 
+
 /**
  * Positive return value => get further
  * Negative return value => get closer
@@ -68,9 +69,8 @@ float force(float d)
     if (d < 0.0000000001f) // == 0
         return 0.f;
     constexpr float k = 1.f;
-    constexpr float max_speed = 0.5f;
     float dk = k - d; // dk < 0 => get closer, dk > 0 => get further
-    return constrain(-max_speed, dk < 0 ? -1.f / (dk * dk) : 1.f / dk, max_speed);
+    return dk < 0 ? -1.f / (dk * dk) : 1.f / dk;
 }
 
 static inline vec3 normalize(const vec3& v) {
@@ -79,6 +79,10 @@ static inline vec3 normalize(const vec3& v) {
 
 void scene_exercise::frame_draw(std::map<std::string,GLuint>& shaders, scene_structure& scene, gui_structure& )
 {
+    constexpr float force_weight = 0.05f;
+    constexpr float direction_weight = 0.1f;
+    constexpr float repel_weight = 10.f;
+
     const float dt = timer.update();
     set_gui(particles,timer, trajectories);
 
@@ -90,31 +94,44 @@ void scene_exercise::frame_draw(std::map<std::string,GLuint>& shaders, scene_str
     // static int dir_idx = 0;
     // static const vec3 directions[] = {{0,1,0}, {1,0,0}, {0.5,0.5,0}, {0.5,-0.5,0}, {-0.5,0.5,0}, {-0.5,0.5,0}, {0,-1,0}, {-1,0,0}};
     // constexpr auto dir_count = 8;
-    const float dir_weight = 0.015f;
     static vec3 direction = {0.0,0.0,0.0};
 
     if (!hacked_timer()) {
         hacked_timer(2000);
         // direction = directions[dir_idx++ % dir_count];
         const auto between_minus_one_and_one = [](){
-            return 2.f * (static_cast <float> (rand()) / static_cast <float> (RAND_MAX)) - 1.f;
+            return 2.f * (static_cast<float>(rand()) / static_cast<float>(RAND_MAX)) - 1.f;
         };
         direction = normalize({between_minus_one_and_one(), between_minus_one_and_one(), 0.f});
     }
 
     // 
     // Add forces ...
+    constexpr float radius = 10.f;
     for(int i=0; i<N; ++i)
     {
+        const vec3& p = particles[i].p;
+        float theta = acos(p.x / norm(p));
+        if (p.y < 0)
+            theta = 2.f * M_PI - theta;
+        const vec3 sphere_edge = {radius * static_cast<float>(cos(theta)), radius * static_cast<float>(sin(theta)), 0.f};
+        const vec3 towards_sphere_center = (norm(p) < norm(sphere_edge) ? 1.f : -1.f) * (p - sphere_edge);
+        const float dist_to_edge = norm(towards_sphere_center);
+        const float f = constrain(0.f, 1.f / (1.f - dist_to_edge / radius), repel_weight);
+        std::cout << dist_to_edge << " --- " << f << std::endl;
+        particles[i].f += f * normalize(towards_sphere_center);
+
         for(int j=i+1; j<N; ++j)
         {
                 const vec3& pi = particles[i].p;
                 const vec3& pj = particles[j].p;
-                vec3 f = force(norm(pi - pj)) * normalize(pi - pj);
-                particles[i].f += f;
-                particles[j].f += -f;
-                particles[i].f += dir_weight * direction;
-                particles[j].f += dir_weight * direction;
+                float f = force(norm(pi - pj));
+                f = constrain(-force_weight, f, force_weight);
+                vec3 fv = f * normalize(pi - pj);
+                particles[i].f += fv;
+                particles[j].f += -fv;
+                particles[i].f += direction_weight * direction;
+                particles[j].f += direction_weight * direction;
         }
     }
 
