@@ -59,6 +59,12 @@ static inline T constrain(const T& min, const T& val, const T& max) {
     return std::max(std::min(val, max), min);
 }
 
+static inline vec3 constrain(const vec3& min, const vec3& val, const vec3& max) {
+    return {constrain(min.x, val.x, max.x),
+            constrain(min.y, val.y, max.y),
+            constrain(min.z, val.z, max.z)};
+}
+
 
 /**
  * Positive return value => get further
@@ -68,7 +74,7 @@ float force(float d)
 {
     if (d < 0.0000000001f) // == 0
         return 0.f;
-    constexpr float k = 1.f;
+    constexpr float k = 0.5f;
     float dk = k - d; // dk < 0 => get closer, dk > 0 => get further
     return dk < 0 ? -1.f / (dk * dk) : 1.f / dk;
 }
@@ -79,9 +85,8 @@ static inline vec3 normalize(const vec3& v) {
 
 void scene_exercise::frame_draw(std::map<std::string,GLuint>& shaders, scene_structure& scene, gui_structure& )
 {
-    constexpr float force_weight = 0.05f;
-    constexpr float direction_weight = 0.1f;
-    constexpr float repel_weight = 10.f;
+    constexpr float max_force = 0.4f;
+    constexpr float max_direction = 0.1f;
 
     const float dt = timer.update();
     set_gui(particles,timer, trajectories);
@@ -107,31 +112,23 @@ void scene_exercise::frame_draw(std::map<std::string,GLuint>& shaders, scene_str
 
     // 
     // Add forces ...
-    constexpr float radius = 10.f;
     for(int i=0; i<N; ++i)
     {
         const vec3& p = particles[i].p;
-        float theta = acos(p.x / norm(p));
-        if (p.y < 0)
-            theta = 2.f * M_PI - theta;
-        const vec3 sphere_edge = {radius * static_cast<float>(cos(theta)), radius * static_cast<float>(sin(theta)), 0.f};
-        const vec3 towards_sphere_center = (norm(p) < norm(sphere_edge) ? 1.f : -1.f) * (p - sphere_edge);
-        const float dist_to_edge = norm(towards_sphere_center);
-        const float f = constrain(0.f, 1.f / (1.f - dist_to_edge / radius), repel_weight);
-        std::cout << dist_to_edge << " --- " << f << std::endl;
-        particles[i].f += f * normalize(towards_sphere_center);
+        const float f = expf(norm(p) / 2.f);
+        particles[i].f += f * normalize(-normalize(p));
 
         for(int j=i+1; j<N; ++j)
         {
                 const vec3& pi = particles[i].p;
                 const vec3& pj = particles[j].p;
                 float f = force(norm(pi - pj));
-                f = constrain(-force_weight, f, force_weight);
+                f = constrain(-max_force, f, max_force);
                 vec3 fv = f * normalize(pi - pj);
                 particles[i].f += fv;
                 particles[j].f += -fv;
-                particles[i].f += direction_weight * direction;
-                particles[j].f += direction_weight * direction;
+                particles[i].f += max_direction * direction;
+                particles[j].f += max_direction * direction;
         }
     }
 
@@ -141,7 +138,8 @@ void scene_exercise::frame_draw(std::map<std::string,GLuint>& shaders, scene_str
     {
         particle_structure& particle = particles[k];
 
-        particle.v = particle.v + dt*particle.f;
+        const vec3 max_speed = {5, 5, 0};
+        particle.v = constrain(-max_speed, particle.v + dt*particle.f, max_speed);
         particle.p = particle.p + dt*particle.v;
         trajectories[k].add_point(particle.p);
     }
@@ -161,10 +159,10 @@ void scene_exercise::frame_draw(std::map<std::string,GLuint>& shaders, scene_str
     }
 
     //a commenter pour virer les traces
-    for(size_t k=0; k<N; ++k)
-    {
-        trajectories[k].draw(shaders["curve"], scene.camera);
-    }
+    // for(size_t k=0; k<N; ++k)
+    // {
+    //     trajectories[k].draw(shaders["curve"], scene.camera);
+    // }
 }
 
 
